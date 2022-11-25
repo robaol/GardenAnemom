@@ -6,12 +6,14 @@ LCD_TYPE lcd(0x27);
 #define LCD_COLS (20)
 #define LCD_ROWS (4)
 char lcd_buf[LCD_COLS+1] = "";
+char lcd_bufdbg[LCD_COLS+1] = "";
 
 float curr_kt = 0.f, max_kt = 0.f, avg_kt = 0.f;
 uint16_t analogCounts = 0;
 
 //See https://www.adafruit.com/product/1733
-#define NO_WIND_VOLTS (0.4f) 
+//#define NO_WIND_VOLTS (0.4f) 
+#define NO_WIND_VOLTS (0.44f) 
 #define MAX_WIND_VOLTS (2.0f)
 #define MAX_WIND_MPERSEC (32.4f)
 #define VOLTS_PER_COUNT (5.f/1024.f)
@@ -59,33 +61,48 @@ void setup() {
 }
 
 void loop() {
+  static uint8_t loop = 0;
+  static float curr_v = 0., currWind_v = 0.f;
   // put your main code here, to run repeatedly:
   static float expWeight = 1.f;
   analogCounts = analogRead(SENSOR_PIN);
-  curr_kt = (analogCounts * VOLTS_PER_COUNT);
-  curr_kt = (curr_kt - NO_WIND_VOLTS)
-            * (MAX_WIND_MPERSEC / (MAX_WIND_VOLTS - NO_WIND_VOLTS));
-  curr_kt *= MPERSEC_TO_KT;
+  curr_v = (analogCounts * VOLTS_PER_COUNT);
+  currWind_v = (curr_v - NO_WIND_VOLTS);
 
-  if (curr_kt > max_kt)
-    max_kt = curr_kt;
+  if (currWind_v > 0.f)
+  {
+    curr_kt = currWind_v * (MAX_WIND_MPERSEC / (MAX_WIND_VOLTS - NO_WIND_VOLTS));
+    curr_kt *= MPERSEC_TO_KT;
+    if (curr_kt > max_kt)
+      max_kt = curr_kt;
 
-  avg_kt = expWeight * curr_kt + (1.f - expWeight) * avg_kt;
-  /*
-   * See https://en.wikipedia.org/wiki/Exponential_smoothing#Time_constant
-   *
-   * expWeight = 1 - e^(-DeltaT/tau)
-   * or
-   * tau = -DeltaT / ln(1 - expWeight)
-   * or, traditionally,
-   * expWeight = 0.9 !! :)
-   */
-  expWeight = 0.9f;
-  snprintf(lcd_buf, sizeof(lcd_buf), "%3.1f %3.1f %3.1f", curr_kt, max_kt, avg_kt);
-  Serial.println(lcd_buf);
-  lcd.setCursor(0,1);
-  lcd.print(lcd_buf);
+    avg_kt = expWeight * curr_kt + (1.f - expWeight) * avg_kt;
+    /*
+     * See https://en.wikipedia.org/wiki/Exponential_smoothing#Time_constant
+     *
+     * expWeight = 1 - e^(-DeltaT/tau)
+     * or
+     * tau = -DeltaT / ln(1 - expWeight)
+     * or, traditionally,
+     * expWeight = 0.9 !! :)
+     */
+    expWeight = 0.9f;
+  }
+  if (loop++ % 5 == 0)
+  {
+    snprintf(lcd_buf, sizeof(lcd_buf),
+             "% 3.1f % 3.1f % 3.1f ",
+             curr_kt, max_kt, avg_kt);
+    Serial.println(lcd_buf);
+    lcd.setCursor(0, 1);
+    lcd.print(lcd_buf);
+
+    snprintf(lcd_bufdbg, sizeof(lcd_bufdbg),
+             "% 4d % 4.3fv W% 4.3fv",
+             analogCounts, curr_v, currWind_v);
+    lcd.setCursor(0, 2);
+    lcd.print(lcd_bufdbg);
+  }
 
   delay(200);
-
 }
