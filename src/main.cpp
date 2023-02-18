@@ -12,7 +12,6 @@ float curr_kt = 0.f, max_kt = 0.f, avg_kt = 0.f;
 uint16_t analogCounts = 0;
 
 //See https://www.adafruit.com/product/1733
-//#define NO_WIND_VOLTS (0.4f) 
 #define NO_WIND_VOLTS (0.4f) 
 #define MAX_WIND_VOLTS (2.0f)
 #define MAX_WIND_MPERSEC (32.4f)
@@ -65,24 +64,21 @@ void setup() {
 void loop() {
   static uint8_t loop = 0;
   static uint8_t doMax = 0;
-  static float curr_v = 0., currWind_v = 0.f;
+  static float instant_v = 0., instantWind_v = 0.f, instant_kt;
   // put your main code here, to run repeatedly:
-  static float expWeight = 1.f;
+  static float expWeight = 1.f, expWeightSlow = 1.f;
   analogCounts = analogRead(SENSOR_PIN);
-  curr_v = (analogCounts * VOLTS_PER_COUNT);
-  currWind_v = (curr_v - NO_WIND_VOLTS);
+  instant_v = (analogCounts * VOLTS_PER_COUNT);
+  instantWind_v = (instant_v - NO_WIND_VOLTS);
 
-  if (currWind_v > 0.f)
+  if (instantWind_v > 0.f)
   {
-    curr_kt = currWind_v * (MAX_WIND_MPERSEC / (MAX_WIND_VOLTS - NO_WIND_VOLTS));
-    curr_kt *= MPERSEC_TO_KT;
-    if (loop > 200 && doMax == 0)
-      doMax = 1;
-    if (curr_kt > max_kt && doMax)
-      max_kt = curr_kt;
+    instant_kt = instantWind_v * (MAX_WIND_MPERSEC / (MAX_WIND_VOLTS - NO_WIND_VOLTS));
+    instant_kt *= MPERSEC_TO_KT;
 
+    curr_kt = curr_kt + expWeight * (instant_kt - curr_kt);
 //    avg_kt = expWeight * curr_kt + (1.f - expWeight) * avg_kt;
-    avg_kt = avg_kt + expWeight * (curr_kt - avg_kt);
+    avg_kt = avg_kt + expWeightSlow * (instant_kt - avg_kt);
     /*
      * See https://en.wikipedia.org/wiki/Exponential_smoothing#Time_constant
      *
@@ -95,7 +91,12 @@ void loop() {
      * expWeight = 0.9 !! :)
      */
     expWeight = 0.5f;
-  }
+    expWeightSlow = .0099f;
+
+    if (loop > 200 && doMax == 0)
+      doMax = 1;
+    if (curr_kt > max_kt && doMax)
+      max_kt = curr_kt;  }
   if (loop++ % 10 == 0)
   {
     snprintf(lcd_buf, sizeof(lcd_buf),
@@ -107,7 +108,7 @@ void loop() {
 
     snprintf(lcd_bufdbg, sizeof(lcd_bufdbg),
              "% 4d % 4.3fv W% 6.3fv",
-             analogCounts, curr_v, currWind_v);
+             analogCounts, instant_v, instantWind_v);
     lcd.setCursor(0, 2);
     lcd.print(lcd_bufdbg);
   }
