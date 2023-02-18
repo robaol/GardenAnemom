@@ -13,10 +13,10 @@ uint16_t analogCounts = 0;
 
 //See https://www.adafruit.com/product/1733
 //#define NO_WIND_VOLTS (0.4f) 
-#define NO_WIND_VOLTS (0.44f) 
+#define NO_WIND_VOLTS (0.4f) 
 #define MAX_WIND_VOLTS (2.0f)
 #define MAX_WIND_MPERSEC (32.4f)
-#define VOLTS_PER_COUNT (5.f/1024.f)
+#define VOLTS_PER_COUNT (2.048f/1024.f)
 #define SENSOR_PIN  (A1)
 #define MPERSEC_TO_KT (1.94384f)
 
@@ -40,6 +40,8 @@ void setup() {
   Serial.print("Error: ");
   Serial.print(error);
 
+  analogReference(EXTERNAL);
+
   if (error == 0) {
     Serial.println(": LCD found.");
     lcd.begin(LCD_COLS, LCD_ROWS);  // initialize the lcd
@@ -62,6 +64,7 @@ void setup() {
 
 void loop() {
   static uint8_t loop = 0;
+  static uint8_t doMax = 0;
   static float curr_v = 0., currWind_v = 0.f;
   // put your main code here, to run repeatedly:
   static float expWeight = 1.f;
@@ -73,22 +76,27 @@ void loop() {
   {
     curr_kt = currWind_v * (MAX_WIND_MPERSEC / (MAX_WIND_VOLTS - NO_WIND_VOLTS));
     curr_kt *= MPERSEC_TO_KT;
-    if (curr_kt > max_kt)
+    if (loop > 200 && doMax == 0)
+      doMax = 1;
+    if (curr_kt > max_kt && doMax)
       max_kt = curr_kt;
 
-    avg_kt = expWeight * curr_kt + (1.f - expWeight) * avg_kt;
+//    avg_kt = expWeight * curr_kt + (1.f - expWeight) * avg_kt;
+    avg_kt = avg_kt + expWeight * (curr_kt - avg_kt);
     /*
      * See https://en.wikipedia.org/wiki/Exponential_smoothing#Time_constant
      *
      * expWeight = 1 - e^(-DeltaT/tau)
      * or
      * tau = -DeltaT / ln(1 - expWeight)
+     * where DeltaT = sampling interval
+     * tau = time to return to true value after step function
      * or, traditionally,
      * expWeight = 0.9 !! :)
      */
-    expWeight = 0.9f;
+    expWeight = 0.5f;
   }
-  if (loop++ % 5 == 0)
+  if (loop++ % 10 == 0)
   {
     snprintf(lcd_buf, sizeof(lcd_buf),
              "% 3.1f % 3.1f % 3.1f ",
@@ -98,11 +106,11 @@ void loop() {
     lcd.print(lcd_buf);
 
     snprintf(lcd_bufdbg, sizeof(lcd_bufdbg),
-             "% 4d % 4.3fv W% 4.3fv",
+             "% 4d % 4.3fv W% 6.3fv",
              analogCounts, curr_v, currWind_v);
     lcd.setCursor(0, 2);
     lcd.print(lcd_bufdbg);
   }
 
-  delay(200);
+  delay(100);//10Hz
 }
