@@ -71,10 +71,12 @@ void loop() {
   instant_v = (analogCounts * VOLTS_PER_COUNT);
   instantWind_v = (instant_v - NO_WIND_VOLTS);
 
-  if (instantWind_v > 0.f)
+  instant_kt = instantWind_v * (MAX_WIND_MPERSEC / (MAX_WIND_VOLTS - NO_WIND_VOLTS));
+  instant_kt *= MPERSEC_TO_KT;
+
+  // There seems to be .1V of noise from anemometer, even when stopped
+  if (instant_kt > 5.0f && instant_v > 0.5f)
   {
-    instant_kt = instantWind_v * (MAX_WIND_MPERSEC / (MAX_WIND_VOLTS - NO_WIND_VOLTS));
-    instant_kt *= MPERSEC_TO_KT;
 
     curr_kt = curr_kt + expWeight * (instant_kt - curr_kt);
 //    avg_kt = expWeight * curr_kt + (1.f - expWeight) * avg_kt;
