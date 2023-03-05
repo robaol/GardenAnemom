@@ -79,7 +79,7 @@ void loop() {
   {
 
     curr_kt = curr_kt + expWeight * (instant_kt - curr_kt);
-//    avg_kt = expWeight * curr_kt + (1.f - expWeight) * avg_kt;
+    //    avg_kt = expWeight * curr_kt + (1.f - expWeight) * avg_kt;
     avg_kt = avg_kt + expWeightSlow * (instant_kt - avg_kt);
     /*
      * See https://en.wikipedia.org/wiki/Exponential_smoothing#Time_constant
@@ -98,7 +98,9 @@ void loop() {
     if (loop > 200 && doMax == 0)
       doMax = 1;
     if (curr_kt > max_kt && doMax)
-      max_kt = curr_kt;  }
+      max_kt = curr_kt;
+  }
+  
   if (loop++ % 10 == 0)
   {
     snprintf(lcd_buf, sizeof(lcd_buf),
